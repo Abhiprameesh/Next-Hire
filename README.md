@@ -1,4 +1,4 @@
-# Job Search Platform
+# Jobe Search Platform
 
 ## Overview
 The Job Search Platform is a lightweight, AI-powered application built using **Streamlit** that simplifies job hunting by analyzing uploaded resumes and displaying relevant job postings from multiple sources. This project fetches job data directly using web scraping and text processing scripts.
@@ -18,7 +18,7 @@ The Job Search Platform is a lightweight, AI-powered application built using **S
 1. Clone the repository:
    ```bash
    git clone https://github.com/Abhiprameesh/Next-Hire.git
-   cd Job-Search
+   cd Next-Hire
    ```
 
 2. Run the Streamlit app:
