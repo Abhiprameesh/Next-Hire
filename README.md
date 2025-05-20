@@ -17,7 +17,7 @@ The Job Search Platform is a lightweight, AI-powered application built using **S
 ### Installation Steps
 1. Clone the repository:
    ```bash
-   git clone https://github.com/snehaapratap/Job-Search.git
+   git clone https://github.com/Abhiprameesh/Next-Hire.git
    cd Job-Search
    ```
 
