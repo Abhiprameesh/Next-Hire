@@ -1,12 +1,12 @@
-# Jobe Search Platform
+# Next-Hire
 
 ## Overview
-The Job Search Platform is a lightweight, AI-powered application built using **Streamlit** that simplifies job hunting by analyzing uploaded resumes and displaying relevant job postings from multiple sources. This project fetches job data directly using web scraping and text processing scripts.
+The Next-Hire is a lightweight, AI-powered application built using **Streamlit** that simplifies job hunting by analyzing uploaded resumes and displaying relevant job postings from multiple sources. This project fetches job data directly using web scraping and text processing scripts.
 
 ## Features
 - **Resume Upload**: Users can upload their resumes in PDF format.
 - **Resume Parsing**: Extracts key information such as skills, education, and experience using NLP techniques.
-- **Job Matching**: Fetches job postings from popular platforms (e.g., Indeed, Naukri) based on the user's profile.
+- **Job Matching**: Fetches job postings from popular platforms (e.g., Indeed, Naukri, Jooble, Foundit) based on the user's profile.
 - **Job Listings Display**: Displays relevant job postings in a user-friendly Streamlit interface.
 
 ## Tech Stack
