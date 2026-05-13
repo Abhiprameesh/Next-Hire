@@ -4,7 +4,7 @@ from groq import Groq
 import streamlit as st
 
 # API Key for Groq
-GROQ_API_KEY = "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"  
+GROQ_API_KEY = ""  
 
 def extract_text_from_pdf(pdf_path):
     """
