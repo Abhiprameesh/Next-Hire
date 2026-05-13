@@ -8,9 +8,12 @@ import time
 import os
 import http.client
 import json
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Jooble API Configuration
-JOOBLE_API_KEY = "b0ca463a-d6e4-40f8-828c-a3b8cbdd8bca"  
+JOOBLE_API_KEY = os.environ.get("JOOBLE_API_KEY", "")
 JOOBLE_HOST = "jooble.org"
 
 def manage_job_cards_file():
@@ -98,11 +101,11 @@ def naukri_auto_extract(jobtitle):
     email_field = WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.XPATH, '//*[@id="usernameField"]'))
     )
-    email_field.send_keys("sneha.prem918@gmail.com")  
+    email_field.send_keys(os.environ.get("NAUKRI_EMAIL", ""))  
     password_field = WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.XPATH, '//*[@id="passwordField"]'))
     )
-    password_field.send_keys("Testing@12")  
+    password_field.send_keys(os.environ.get("NAUKRI_PASSWORD", ""))  
 
     try:
         login_button = WebDriverWait(driver, 10).until(

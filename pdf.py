@@ -2,9 +2,12 @@ import os
 import PyPDF2
 from groq import Groq
 import streamlit as st
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # API Key for Groq
-GROQ_API_KEY = ""  
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 
 def extract_text_from_pdf(pdf_path):
     """
