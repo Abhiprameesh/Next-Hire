@@ -77,37 +77,46 @@ if "job_listings_text" not in st.session_state:
     st.session_state.job_listings_text = None
 
 st.sidebar.title("Navigation")
-if st.session_state.page == "Upload Resume":
-    st.sidebar.radio("Go to", ["Upload Resume", "Job Analysis", "Results"], index=0, key="nav")
-elif st.session_state.page == "Job Analysis":
-    st.sidebar.radio("Go to", ["Upload Resume", "Job Analysis", "Results"], index=1, key="nav")
-elif st.session_state.page == "Results":
-    st.sidebar.radio("Go to", ["Upload Resume", "Job Analysis", "Results"], index=2, key="nav")
+nav_options = ["Upload Resume", "Job Analysis", "Results"]
+current_index = nav_options.index(st.session_state.page) if st.session_state.page in nav_options else 0
+selected_nav = st.sidebar.radio("Go to", nav_options, index=current_index)
+if selected_nav != st.session_state.page:
+    st.session_state.page = selected_nav
+    st.rerun()
 
 if st.session_state.page == "Upload Resume":
     st.header("Step 1: Upload Your Resume")
     uploaded_file = st.file_uploader("Upload a PDF file:", type=["pdf"])
     
     if uploaded_file is not None:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            tmp.write(uploaded_file.getvalue())
-            tmp_path = tmp.name
-        
-        with st.status("Analyzing your resume...", expanded=True) as status:
-            st.write("📄 Extracting text from PDF...")
-            resume_text = extract_text_from_pdf(tmp_path)
-            st.write("🧠 Identifying key domains...")
-            domains = extract_domains_from_pdf(tmp_path)
-            st.session_state.domains = domains
-            st.session_state.resume_text = resume_text
-            status.update(label="Resume Analysis Complete!", state="complete", expanded=False)
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                tmp.write(uploaded_file.getvalue())
+                tmp_path = tmp.name
+            
+            with st.status("Analyzing your resume...", expanded=True) as status:
+                st.write("📄 Extracting text from PDF...")
+                resume_text = extract_text_from_pdf(tmp_path)
+                
+                if not resume_text:
+                    status.update(label="Could not extract text from PDF.", state="error", expanded=True)
+                    st.error("No readable text found in this PDF. Please make sure it is not a scanned image.")
+                else:
+                    st.write("🧠 Identifying key domains...")
+                    domains = extract_domains_from_pdf(resume_text)
+                    st.session_state.domains = domains
+                    st.session_state.resume_text = resume_text
+                    status.update(label="Resume Analysis Complete!", state="complete", expanded=False)
 
-        st.subheader("🎯 Key Domains Identified")
-        pills_html = "".join([f'<span class="domain-pill">{d}</span>' for d in st.session_state.domains])
-        st.markdown(f"<div>{pills_html}</div><br>", unsafe_allow_html=True)
-        
-        st.session_state.page = "Job Analysis"
-        st.rerun()
+                    st.session_state.page = "Job Analysis"
+                    st.rerun()
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
     else:
         st.info("Please upload a PDF file to continue.")
 
@@ -116,6 +125,10 @@ elif st.session_state.page == "Job Analysis":
     if st.session_state.domains is None or st.session_state.resume_text is None:
         st.warning("Please upload your resume first in 'Upload Resume' section.")
     else:
+        st.subheader("🎯 Key Domains Identified")
+        pills_html = "".join([f'<span class="domain-pill">{d}</span>' for d in st.session_state.domains])
+        st.markdown(f"<div>{pills_html}</div><br>", unsafe_allow_html=True)
+
         options = ["Select a job site", "Indeed", "Naukri", "Foundit", "Jooble"]
         choice = st.selectbox("Choose a job site:", options)
 
@@ -138,12 +151,15 @@ elif st.session_state.page == "Job Analysis":
                     generate_job_listings(st.session_state.domains)
                     st.session_state.job_listings_text = load_job_listings_from_file("jooble_job_cards.txt")
 
-                st.write("🤖 AI is matching your skills with these jobs...")
-                analyze_resume_with_job_listings(st.session_state.resume_text, st.session_state.job_listings_text)
-                status.update(label="Job Analysis Completed!", state="complete", expanded=False)
-
-            st.session_state.page = "Results"
-            st.rerun()
+                if not st.session_state.job_listings_text or not st.session_state.job_listings_text.strip():
+                    status.update(label="No jobs found for selected domain(s).", state="error", expanded=True)
+                    st.warning(f"Could not retrieve job listings from {choice}. Please check your connection, API credentials, or try another option (e.g., Jooble).")
+                else:
+                    st.write("🤖 AI is matching your skills with these jobs...")
+                    analyze_resume_with_job_listings(st.session_state.resume_text, st.session_state.job_listings_text)
+                    status.update(label="Job Analysis Completed!", state="complete", expanded=False)
+                    st.session_state.page = "Results"
+                    st.rerun()
 
 elif st.session_state.page == "Results":
     st.header("Step 3: View Analysis Results")

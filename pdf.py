@@ -1,4 +1,5 @@
 import os
+import re
 import PyPDF2
 from groq import Groq
 import streamlit as st
@@ -11,84 +12,101 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 
 def extract_text_from_pdf(pdf_path):
     """
-    Extracts text from a PDF file.
+    Extracts text from a PDF file safely.
     """
+    text = ""
     with open(pdf_path, 'rb') as file:
         reader = PyPDF2.PdfReader(file)
-        text = ""
         for page in reader.pages:
-            text += page.extract_text()
-    return text
+            extracted = page.extract_text()
+            if extracted:
+                text += extracted + "\n"
+    return text.strip()
 
 def analyze_resume_with_llama(text):
     """
     Analyze the extracted text using the Groq API.
     """
+    if not GROQ_API_KEY:
+        st.error("GROQ_API_KEY is not set. Please add it to your .env file.")
+        return ""
+
     client = Groq(api_key=GROQ_API_KEY)
 
     prompt = f"""
     Analyze the following resume text and identify key domains related to the skills, projects, internships, and interests mentioned.
-    Limit the identified domains to 6 critically most important ones. Provide only the domain names without any numbers, descriptions, or attached explanations.
+    Limit the identified domains to 6 critically most important ones. Provide only the domain names, one per line, without any numbers, bullet symbols, descriptions, or attached explanations.
 
     Resume Text: {text}
     """
-    completion = client.chat.completions.create(
-        model="llama3-70b-8192",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7,
-        max_tokens=512,
-        top_p=1,
-        stream=True,
-        stop=None,
-    )
+    try:
+        completion = client.chat.completions.create(
+            model="llama3-70b-8192",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=512,
+            top_p=1,
+            stream=True,
+            stop=None,
+        )
 
-    analysis_result = ""
-    for chunk in completion:
-        chunk_content = chunk.choices[0].delta.content or ""
-        analysis_result += chunk_content
+        analysis_result = ""
+        for chunk in completion:
+            chunk_content = chunk.choices[0].delta.content or ""
+            analysis_result += chunk_content
 
-    return analysis_result
+        return analysis_result
+    except Exception as e:
+        st.error(f"Error calling Groq API: {e}")
+        return ""
 
-
-#     return domains
-def extract_domains_from_pdf(pdf_path):
+def extract_domains_from_pdf(pdf_path_or_text):
     """
-    Function to analyze PDF and extract important domains.
+    Function to analyze PDF (or pre-extracted text) and extract important domains.
     """
-    if not os.path.exists(pdf_path):
-        st.error("The specified PDF file does not exist.")
-        return [] 
-    
-    resume_text = extract_text_from_pdf(pdf_path)
+    if isinstance(pdf_path_or_text, str) and os.path.exists(pdf_path_or_text):
+        resume_text = extract_text_from_pdf(pdf_path_or_text)
+    else:
+        resume_text = pdf_path_or_text
+
     analysis = analyze_resume_with_llama(resume_text)
-    domains = extract_and_limit_domains(analysis, max_domains=15)
+    domains = extract_and_limit_domains(analysis, max_domains=6)
     return domains
 
-def extract_and_limit_domains(analysis_result, max_domains=15):
+def extract_and_limit_domains(analysis_result, max_domains=6):
     """
     Extract important domains from the analysis result and limit to a maximum count.
+    Cleans leading numbers, bullet symbols, and non-domain text.
     """
     domains = []
     lines = analysis_result.split("\n")
 
     for line in lines:
-        domain = line.strip()  
-        if domain and len(domain.split()) <= 5:  
-            domains.append(domain)
+        cleaned = re.sub(r'^[\d+\.\-\*\•\s]+', '', line).strip()
+        # Filter out empty lines or conversational responses
+        if cleaned and len(cleaned.split()) <= 5 and not cleaned.lower().startswith(("here", "domain", "note", "based")):
+            if cleaned not in domains:
+                domains.append(cleaned)
 
     return domains[:max_domains]
 
 def load_job_listings_from_file(file_path="job_listings.txt"):
     """
-    Load job listings from a text file.
+    Load job listings from a text file with UTF-8 encoding.
     """
-    with open(file_path, 'r') as file:
+    if not os.path.exists(file_path):
+        return ""
+    with open(file_path, 'r', encoding='utf-8') as file:
         return file.read()
 
 def analyze_resume_with_job_listings(resume_text, job_listings_text):
     """
     Analyze the resume and job listings using the Groq API.
     """
+    if not GROQ_API_KEY:
+        st.error("GROQ_API_KEY is not set. Please add it to your .env file.")
+        return
+
     client = Groq(api_key=GROQ_API_KEY)
 
     prompt = f"""
@@ -120,61 +138,69 @@ def analyze_resume_with_job_listings(resume_text, job_listings_text):
     Job Listings:
     {job_listings_text}
     """
-    completion = client.chat.completions.create(
-        model="llama3-70b-8192",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7,
-        max_tokens=2048,
-        top_p=1,
-        stream=True,
-        stop=None,
-    )
+    try:
+        completion = client.chat.completions.create(
+            model="llama3-70b-8192",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=2048,
+            top_p=1,
+            stream=True,
+            stop=None,
+        )
 
-    analysis_result = ""
-    for chunk in completion:
-        chunk_content = chunk.choices[0].delta.content or ""
-        analysis_result += chunk_content
+        analysis_result = ""
+        for chunk in completion:
+            chunk_content = chunk.choices[0].delta.content or ""
+            analysis_result += chunk_content
 
-    # Save the result to a text file
-    output_file = "job_analysis_results.txt"
-    with open(output_file, "w", encoding="utf-8") as file:
-        file.write(analysis_result)
+        # Save the result to a text file
+        output_file = "job_analysis_results.txt"
+        with open(output_file, "w", encoding="utf-8") as file:
+            file.write(analysis_result)
 
+    except Exception as e:
+        st.error(f"Error analyzing job listings with Groq: {e}")
 
 def display_jobs_by_category(content):
     """
     Displays job analysis results in a structured format using Streamlit.
-    
-    Args:
-        content (str): The content of the job analysis results
+    Gracefully falls back to markdown display if custom parser encounters unexpected format.
     """
     try:
-        current_category = None
-        
         lines = content.split('\n')
+        parsed_any = False
         for line in lines:
-            line = line.strip()
-            if not line:
+            stripped = line.strip()
+            if not stripped:
                 continue
 
-            if line.startswith("**") and line.endswith("**"):
-                current_category = line.replace("**", "").strip()
-                st.header(current_category)
+            if stripped.startswith("**") and stripped.endswith("**"):
+                category = stripped.replace("**", "").strip()
+                st.header(category)
+                parsed_any = True
 
-            elif line[0].isdigit() and line[1] == ".":
-                job_title = line.split('. ', 1)[1].strip()
+            elif re.match(r'^\d+\.', stripped):
+                job_title = re.sub(r'^\d+\.\s*', '', stripped).strip()
                 st.subheader(job_title)
+                parsed_any = True
 
-            elif line.startswith('* '):
-                parts = line.replace('* ', '').split(': ', 1)
-                if len(parts) == 2:
-                    key, value = parts
+            elif stripped.startswith(('* ', '- ')):
+                cleaned = stripped[2:].strip()
+                if ': ' in cleaned:
+                    key, value = cleaned.split(': ', 1)
                     st.markdown(f"**{key}:** {value}")
+                else:
+                    st.markdown(f"- {cleaned}")
+                parsed_any = True
 
-            elif line.startswith('---'):
+            elif stripped.startswith('---'):
                 st.markdown("---")
+                parsed_any = True
+
+        if not parsed_any:
+            st.markdown(content)
 
     except Exception as e:
-        st.error(f"Error parsing job listings: {str(e)}")
-        st.text("Content that caused error:")
-        st.code(content)
+        st.warning(f"Displaying results in standard format: {str(e)}")
+        st.markdown(content)
